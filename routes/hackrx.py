@@ -3,7 +3,7 @@ import requests
 import hashlib
 import time
 import asyncio
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
@@ -19,7 +19,6 @@ router = APIRouter()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
-API_BEARER_TOKEN = os.getenv("API_BEARER_TOKEN")
 
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
@@ -30,10 +29,7 @@ class HackRxRequest(BaseModel):
 
 
 @router.post("/run")
-async def run_hackrx(payload: HackRxRequest, authorization: str = Header(None)):
-    if API_BEARER_TOKEN and authorization != f"Bearer {API_BEARER_TOKEN}":
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
+async def run_hackrx(payload: HackRxRequest):
     start_total = time.time()
 
     doc_id = hashlib.md5(payload.documents.encode("utf-8")).hexdigest()
@@ -124,8 +120,6 @@ Answer:"""
     accuracy = (successful / len(final_answers) * 100) if final_answers else 0
 
     print(f"Total response time: {total_time:.2f} seconds")
-    # print(f"Average response time per question: {avg_time:.2f} seconds")
-    # print(f"Approximate accuracy: {accuracy:.2f}%")
 
     # Delete the temp PDF file after processing is complete
     try:
