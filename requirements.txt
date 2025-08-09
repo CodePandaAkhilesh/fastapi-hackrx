@@ -8,3 +8,5 @@ langchain-pinecone
 langchain-google-genai
 pypdf
 pinecone-client
+gunicorn
+
