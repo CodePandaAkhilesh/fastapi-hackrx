@@ -120,6 +120,11 @@ Content-Type: application/json
         "Are there any sub-limits on room rent and ICU charges for Plan A?"
     ]
 }
+```
+
+---
+
+```
 Response Format:
 
 {
@@ -137,6 +142,7 @@ Response Format:
     ]
 }
 ```
+
 ---
 
 ## 💡 Implementation Highlights
