@@ -1,7 +1,7 @@
 import os
 import requests
 import hashlib
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
@@ -14,98 +14,59 @@ load_dotenv()
 
 router = APIRouter()
 
-# --- Models ---
+# Pinecone and Gemini setup
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+index_name = os.getenv("PINECONE_INDEX_NAME")
+embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+
 class HackRxRequest(BaseModel):
     pdf_url: str
     questions: list[str]
 
-# --- Config ---
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "hackrx-index")
+def download_pdf(pdf_url):
+    """Download PDF from URL and return file path."""
+    try:
+        response = requests.get(pdf_url)
+        response.raise_for_status()
+        file_hash = hashlib.sha256(pdf_url.encode()).hexdigest()[:16]
+        file_path = f"/tmp/{file_hash}.pdf"
+        with open(file_path, "wb") as f:
+            f.write(response.content)
+        return file_path
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to download PDF: {e}")
 
-if not PINECONE_API_KEY or not GOOGLE_API_KEY:
-    raise RuntimeError("Missing PINECONE_API_KEY or GOOGLE_API_KEY in environment variables")
-
-# --- Initialize Clients ---
-pc = Pinecone(api_key=PINECONE_API_KEY)
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY)
-
-# --- Helper functions ---
-def download_pdf(pdf_url, save_path):
-    r = requests.get(pdf_url)
-    if r.status_code != 200:
-        raise HTTPException(status_code=400, detail="Failed to download PDF")
-    with open(save_path, "wb") as f:
-        f.write(r.content)
-
-def pdf_hash(pdf_url):
-    return hashlib.sha256(pdf_url.encode()).hexdigest()
-
-def index_exists(vectorstore, namespace):
-    stats = pc.Index(INDEX_NAME).describe_index_stats()
-    return namespace in stats.get("namespaces", {})
-
-def process_pdf(pdf_url, namespace):
-    pdf_path = f"/tmp/{namespace}.pdf"
-    download_pdf(pdf_url, pdf_path)
-
-    loader = PyPDFLoader(pdf_path)
+def process_pdf(file_path):
+    """Load, split, and embed PDF into Pinecone."""
+    loader = PyPDFLoader(file_path)
     docs = loader.load()
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    chunks = splitter.split_documents(docs)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    splits = text_splitter.split_documents(docs)
 
-    vectorstore = PineconeVectorStore.from_documents(
-        documents=chunks,
-        embedding=embeddings,
-        index_name=INDEX_NAME,
-        namespace=namespace
-    )
+    vectorstore = PineconeVectorStore.from_documents(splits, embeddings, index_name=index_name)
     return vectorstore
 
-def query_pdf(vectorstore, questions):
+def answer_questions(vectorstore, questions):
+    """Answer each question based on Pinecone search."""
     answers = []
     for q in questions:
         retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
         docs = retriever.get_relevant_documents(q)
-        context = "\n\n".join([d.page_content for d in docs])
-
-        prompt = f"""You are an expert assistant. 
-        Use the following context to answer the question. 
-        If the answer is not present in the context, say 'Answer not found in the document.'
-
-        Context:
-        {context}
-
-        Question: {q}
-        Answer:"""
-
+        context = "\n".join([doc.page_content for doc in docs])
+        prompt = f"Based on the following context, answer the question:\n\n{context}\n\nQuestion: {q}"
         resp = llm.invoke(prompt)
         answers.append(resp.content.strip())
-
     return answers
 
-# --- Routes ---
 @router.post("/run")
-async def run_hackrx(data: HackRxRequest, authorization: str = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
-
-    namespace = pdf_hash(data.pdf_url)
-    vectorstore = PineconeVectorStore(
-        index=pc.Index(INDEX_NAME),
-        embedding=embeddings,
-        namespace=namespace
-    )
-
-    if not index_exists(vectorstore, namespace):
-        vectorstore = process_pdf(data.pdf_url, namespace)
-
-    answers = query_pdf(vectorstore, data.questions)
-
+async def run_hackrx(request: HackRxRequest):
+    pdf_path = download_pdf(request.pdf_url)
+    vectorstore = process_pdf(pdf_path)
+    answers = answer_questions(vectorstore, request.questions)
     return {"answers": answers}
+
 
 
 # import os
