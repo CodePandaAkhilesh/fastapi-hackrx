@@ -141,13 +141,14 @@ Response Format:
 
 ## 💡 Implementation Highlights
 ```
-🔑 **Document Hashing** – MD5 to uniquely tag docs (`doc_id`) for filtering.
-📄 **Chunking** – 1000 chars, 200 overlap → balances context & redundancy.
-📌 **Marker Vector** – Stores doc-level embedding for quick reference.
+🔑 Document Hashing – MD5 to uniquely tag docs (`doc_id`) for filtering.
+📄 Chunking – 1000 chars, 200 overlap → balances context & redundancy.
+📌 Marker Vector – Stores doc-level embedding for quick reference.
 ⚡ **Concurrency** – `asyncio.gather` for parallel Q&A handling.
-🧹 **Cleanup** – Temporary files deleted post-processing.
-
+🧹 Cleanup – Temporary files deleted post-processing.
 ```
+
+---
 
 ## 🏆 Unique Selling Points (USP)
 ```
