@@ -141,22 +141,22 @@ Response Format:
 
 ## 💡 Implementation Highlights
 
-🔑 Document Hashing – MD5 to uniquely tag docs (`doc_id`) for filtering.
-📄 Chunking – 1000 chars, 200 overlap → balances context & redundancy.
-📌 Marker Vector – Stores doc-level embedding for quick reference.
-⚡ Concurrency – `asyncio.gather` for parallel Q&A handling.
-🧹 Cleanup – Temporary files deleted post-processing.
+- 🔑 Document Hashing – MD5 to uniquely tag docs (`doc_id`) for filtering.
+- 📄 Chunking – 1000 chars, 200 overlap → balances context & redundancy.
+- 📌 Marker Vector – Stores doc-level embedding for quick reference.
+- ⚡ Concurrency – `asyncio.gather` for parallel Q&A handling.
+- 🧹 Cleanup – Temporary files deleted post-processing.
 
 
 ---
 
 ## 🏆 Unique Selling Points (USP)
 
-📌 Strict Context Reliance → Answers only from retrieved chunks.
-📌 Traceable Evidence → Metadata maps back to exact page & section.
-📌 Multi-domain Ready → Insurance, legal, HR, compliance.
-📌 Parallel Processing → Multiple questions answered instantly.
-📌 Scalable Deployment → Render + managed Pinecone integration.
+- 📌 Strict Context Reliance → Answers only from retrieved chunks.
+- 📌 Traceable Evidence → Metadata maps back to exact page & section.
+- 📌 Multi-domain Ready → Insurance, legal, HR, compliance.
+- 📌 Parallel Processing → Multiple questions answered instantly.
+- 📌 Scalable Deployment → Render + managed Pinecone integration.
 
 ---
 
@@ -188,4 +188,4 @@ Response Format:
 
 ## 📜 License
 
-MIT License
+- MIT License
