@@ -146,6 +146,7 @@ Response Format:
 📌 **Marker Vector** – Stores doc-level embedding for quick reference.
 ⚡ **Concurrency** – `asyncio.gather` for parallel Q&A handling.
 🧹 **Cleanup** – Temporary files deleted post-processing.
+
 ```
 
 ## 🏆 Unique Selling Points (USP)
@@ -155,6 +156,7 @@ Response Format:
 📌 **Multi-domain Ready** → Insurance, legal, HR, compliance.
 📌 **Parallel Processing** → Multiple questions answered instantly.
 📌 **Scalable Deployment** → Render + managed Pinecone integration.
+
 ```
 
 
