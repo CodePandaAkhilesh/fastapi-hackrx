@@ -90,7 +90,7 @@ async def run_hackrx(payload: HackRxRequest):
     async def answer_question(question: str):
         start_q = time.time()
         try:
-            docs = await asyncio.to_thread(vectorstore.similarity_search, question, k=10, filter={"doc_id": doc_id})
+            docs = await asyncio.to_thread(vectorstore.similarity_search, question, k=5, filter={"doc_id": doc_id})
             context = "\n\n".join([doc.page_content for doc in docs])
             prompt = f"""Answer the following question strictly based on the provided context.
 The answer must be concise but at least 10 words long.
