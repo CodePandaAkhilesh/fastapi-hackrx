@@ -72,37 +72,27 @@ Our solution:
 │   └── pyvenv.cfg
 └── __pycache__/             # Compiled Python cache for main.py
 
-## 🧑‍💻 Installation & Setup
+## ⚙️ Installation & Setup
 
-### Clone Repository
 ```bash
-
+# 1️⃣ Clone Repository
 git clone https://github.com/CodePandaAkhilesh/fastapi-hackrx.git
 cd fastapi-hackrx
 
-
-## **Install Dependencies**
-
+# 2️⃣ Install Dependencies
 pip install -r requirements.txt
 
+# 3️⃣ Create .env File
+GEMINI_API_KEY=your_gemini_api_key
+PINECONE_API_KEY=your_pinecone_api_key
+PINECONE_ENVIRONMENT=us-east-1
+PINECONE_INDEX_NAME=your_index_name
 
-## Environment Variables
-
-## create .env file:
-
-GEMINI_API_KEY = your_gemini_api_key
-PINECONE_API_KEY= your_pinecone_api_key
-PINECONE_ENVIRONMENT= us-east-1 (default)
-PINECONE_INDEX_NAME = your Index Name
-
-
-▶️ Running the App
-Development Mode
+# 4️⃣ Run App in Development Mode
 uvicorn main:app --reload
 
 
-
-Required API Structure:
+📡 Required API Structure:
 Request Format:
 
 POST https://fastapi-hackrx-1.onrender.com/hackrx/run
@@ -144,55 +134,57 @@ Response Format:
 
 💡 Implementation Highlights
 
-Document Hashing: MD5 to uniquely tag docs (doc_id) for filtering.
+🔑 Document Hashing – MD5 to uniquely tag docs (doc_id) for filtering.
 
-Chunking: 1000 chars, 200 overlap → balances context & redundancy.
+📄 Chunking – 1000 chars, 200 overlap → balances context & redundancy.
 
-Marker Vector: Stores doc-level embedding for quick reference.
+📌 Marker Vector – Stores doc-level embedding for quick reference.
 
-Concurrency: asyncio.gather for parallel Q&A handling.
+⚡ Concurrency – asyncio.gather for parallel Q&A handling.
 
-Cleanup: Temporary files deleted post-processing.
+🧹 Cleanup – Temporary files deleted post-processing.
+
+
 
 
 
 🏆 Unique Selling Points (USP)
 
-Strict Context Reliance – Answers only from retrieved chunks → minimizes hallucinations.
+)
+📌 Strict Context Reliance → Answers only from retrieved chunks.
 
-Traceable Evidence – Chunk metadata maps back to original doc page & section.
+📌 Traceable Evidence → Metadata maps back to exact page & section.
 
-Multi-domain Ready – Optimized for insurance, legal, HR, compliance.
+📌 Multi-domain Ready → Insurance, legal, HR, compliance.
 
-Parallel Processing – Handles multiple questions instantly.
+📌 Parallel Processing → Multiple questions answered instantly.
 
-Scalable Deployment – Runs seamlessly on Render with managed Pinecone.
+📌 Scalable Deployment → Render + managed Pinecone integration.
 
 
 
 📈 Business Impact
 
-Insurance – Rapid claims triage & eligibility checks.
+🏥 Insurance → Rapid claims triage & eligibility checks.
 
-Legal – Contract clause extraction & due diligence.
+⚖️ Legal → Contract clause extraction for due diligence.
 
-HR – Policy Q&A for employee benefits & leave rules.
+👥 HR → Employee policy interpretation.
 
-Compliance – Regulatory document search with auditable evidence.
-
+🛡 Compliance → Regulatory searches with audit trail.
 
 
 🔮 Future Enhancements
 
-Cross-document clause matching.
+🔄 Cross-document clause matching.
 
-Web UI for upload, search, and clause highlighting.
+💻 Web UI for uploads, search & highlighting.
 
-Role-based access control & audit logging.
+🔐 Role-based access control & audit logging.
 
-Local FAISS fallback for offline/low-cost scenarios.
+📦 Local FAISS fallback for offline use.
 
-Incremental indexing (no full re-embedding needed).
+⏩ Incremental indexing without re-embedding entire docs.
 
 
 
@@ -202,10 +194,6 @@ Akhilesh Verma – av14021999@gmail.com
 
 Krishnakant Kushwaha – kushwahakrishnakant979@gmail.com
 
-
-
-Test API: https://fastapi-hackrx-1.onrender.com/hackrx/run
-GitHub: https://github.com/CodePandaAkhilesh/fastapi-hackrx
 
 
 📜 License
