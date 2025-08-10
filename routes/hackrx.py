@@ -1,9 +1,6 @@
-# routes/hackrx.py
-
 import os
 import requests
 import hashlib
-import tempfile
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -13,104 +10,103 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pinecone import Pinecone
 
-# Load environment variables
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "hackrx-index")
-
-if not GOOGLE_API_KEY or not PINECONE_API_KEY:
-    raise ValueError("Missing GOOGLE_API_KEY or PINECONE_API_KEY in environment variables.")
-
-# Init Pinecone
-pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index(PINECONE_INDEX_NAME)
 
 router = APIRouter()
 
+# --- Models ---
 class HackRxRequest(BaseModel):
-    documents: str  # PDF URL
+    pdf_url: str
     questions: list[str]
 
-@router.post("/run")
-async def run_hackrx(
-    body: HackRxRequest,
-    authorization: str = Header(None)
-):
-    # Simple Bearer token auth check
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    token = authorization.split(" ")[1]
-    expected_token = os.getenv("HACKRX_BEARER_TOKEN")
-    if expected_token and token != expected_token:
-        raise HTTPException(status_code=403, detail="Forbidden")
+# --- Config ---
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "hackrx-index")
 
-    pdf_url = body.documents
-    questions = body.questions
+if not PINECONE_API_KEY or not GOOGLE_API_KEY:
+    raise RuntimeError("Missing PINECONE_API_KEY or GOOGLE_API_KEY in environment variables")
 
-    if not pdf_url.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF documents are supported.")
+# --- Initialize Clients ---
+pc = Pinecone(api_key=PINECONE_API_KEY)
+embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY)
 
-    # Create a deterministic ID for the document (SHA256 of URL)
-    doc_id = hashlib.sha256(pdf_url.encode()).hexdigest()
+# --- Helper functions ---
+def download_pdf(pdf_url, save_path):
+    r = requests.get(pdf_url)
+    if r.status_code != 200:
+        raise HTTPException(status_code=400, detail="Failed to download PDF")
+    with open(save_path, "wb") as f:
+        f.write(r.content)
 
-    # Check if already in Pinecone
-    stats = index.describe_index_stats()
-    if stats.get("total_vector_count", 0) > 0:
-        if doc_id in stats.get("namespaces", {}):
-            # Skip re-upload, only query
-            return await query_pdf(doc_id, questions)
+def pdf_hash(pdf_url):
+    return hashlib.sha256(pdf_url.encode()).hexdigest()
 
-    # Download PDF to temp file
-    try:
-        response = requests.get(pdf_url, timeout=60)
-        response.raise_for_status()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch PDF: {str(e)}")
+def index_exists(vectorstore, namespace):
+    stats = pc.Index(INDEX_NAME).describe_index_stats()
+    return namespace in stats.get("namespaces", {})
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
-        tmp_pdf.write(response.content)
-        tmp_pdf_path = tmp_pdf.name
+def process_pdf(pdf_url, namespace):
+    pdf_path = f"/tmp/{namespace}.pdf"
+    download_pdf(pdf_url, pdf_path)
 
-    # Load and split
-    loader = PyPDFLoader(tmp_pdf_path)
-    documents = loader.load()
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    docs = splitter.split_documents(documents)
+    loader = PyPDFLoader(pdf_path)
+    docs = loader.load()
 
-    # Embed and store in Pinecone
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
-    PineconeVectorStore.from_documents(
-        docs,
-        embeddings,
-        index_name=PINECONE_INDEX_NAME,
-        namespace=doc_id
-    )
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    chunks = splitter.split_documents(docs)
 
-    # Query
-    return await query_pdf(doc_id, questions)
-
-async def query_pdf(doc_id: str, questions: list[str]):
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
-    vectorstore = PineconeVectorStore(
-        index_name=PINECONE_INDEX_NAME,
+    vectorstore = PineconeVectorStore.from_documents(
+        documents=chunks,
         embedding=embeddings,
-        namespace=doc_id
+        index_name=INDEX_NAME,
+        namespace=namespace
+    )
+    return vectorstore
+
+def query_pdf(vectorstore, questions):
+    answers = []
+    for q in questions:
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
+        docs = retriever.get_relevant_documents(q)
+        context = "\n\n".join([d.page_content for d in docs])
+
+        prompt = f"""You are an expert assistant. 
+        Use the following context to answer the question. 
+        If the answer is not present in the context, say 'Answer not found in the document.'
+
+        Context:
+        {context}
+
+        Question: {q}
+        Answer:"""
+
+        resp = llm.invoke(prompt)
+        answers.append(resp.content.strip())
+
+    return answers
+
+# --- Routes ---
+@router.post("/run")
+async def run_hackrx(data: HackRxRequest, authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    namespace = pdf_hash(data.pdf_url)
+    vectorstore = PineconeVectorStore(
+        index=pc.Index(INDEX_NAME),
+        embedding=embeddings,
+        namespace=namespace
     )
 
-    results = {}
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, google_api_key=GOOGLE_API_KEY)
+    if not index_exists(vectorstore, namespace):
+        vectorstore = process_pdf(data.pdf_url, namespace)
 
-    for q in questions:
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
-        context_docs = retriever.get_relevant_documents(q)
-        context = "\n\n".join([doc.page_content for doc in context_docs])
-        prompt = f"Answer the following question based on the provided context.\n\nContext:\n{context}\n\nQuestion: {q}"
-        answer = llm.invoke(prompt).content
-        results[q] = answer
+    answers = query_pdf(vectorstore, data.questions)
 
-    return {"answers": results}
+    return {"answers": answers}
+
 
 # import os
 # import requests
