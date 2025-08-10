@@ -72,6 +72,8 @@ Our solution:
 │   └── pyvenv.cfg
 └── __pycache__/             # Compiled Python cache for main.py
 
+---
+
 ## ⚙️ Installation & Setup
 
 ```bash
@@ -91,6 +93,7 @@ PINECONE_INDEX_NAME=your_index_name
 # 4️⃣ Run App in Development Mode
 uvicorn main:app --reload
 
+---
 
 📡 Required API Structure:
 Request Format:
@@ -130,71 +133,54 @@ Response Format:
     ]
 }
 
+---
 
+## 💡 Implementation Highlights
 
-💡 Implementation Highlights
+- 🔑 **Document Hashing** – MD5 to uniquely tag docs (`doc_id`) for filtering.
+- 📄 **Chunking** – 1000 chars, 200 overlap → balances context & redundancy.
+- 📌 **Marker Vector** – Stores doc-level embedding for quick reference.
+- ⚡ **Concurrency** – `asyncio.gather` for parallel Q&A handling.
+- 🧹 **Cleanup** – Temporary files deleted post-processing.
 
-🔑 Document Hashing – MD5 to uniquely tag docs (doc_id) for filtering.
+---
 
-📄 Chunking – 1000 chars, 200 overlap → balances context & redundancy.
+## 🏆 Unique Selling Points (USP)
 
-📌 Marker Vector – Stores doc-level embedding for quick reference.
+- 📌 **Strict Context Reliance** → Answers only from retrieved chunks.
+- 📌 **Traceable Evidence** → Metadata maps back to exact page & section.
+- 📌 **Multi-domain Ready** → Insurance, legal, HR, compliance.
+- 📌 **Parallel Processing** → Multiple questions answered instantly.
+- 📌 **Scalable Deployment** → Render + managed Pinecone integration.
 
-⚡ Concurrency – asyncio.gather for parallel Q&A handling.
+---
 
-🧹 Cleanup – Temporary files deleted post-processing.
+## 📈 Business Impact
 
+- 🏥 **Insurance** → Rapid claims triage & eligibility checks.  
+- ⚖️ **Legal** → Contract clause extraction for due diligence.  
+- 👥 **HR** → Employee policy interpretation.  
+- 🛡 **Compliance** → Regulatory searches with audit trail.  
 
+---
 
+## 🔮 Future Enhancements
 
+- 🔄 **Cross-document clause matching**.  
+- 💻 **Web UI** for uploads, search & highlighting.  
+- 🔐 **Role-based access control** & audit logging.  
+- 📦 **Local FAISS fallback** for offline use.  
+- ⏩ **Incremental indexing** without re-embedding entire docs.  
 
-🏆 Unique Selling Points (USP)
+---
 
-)
-📌 Strict Context Reliance → Answers only from retrieved chunks.
+## 📞 Contact
 
-📌 Traceable Evidence → Metadata maps back to exact page & section.
+- **Akhilesh Verma** – 📧 av14021999@gmail.com  
+- **Krishnakant Kushwaha** – 📧 kushwahakrishnakant979@gmail.com  
 
-📌 Multi-domain Ready → Insurance, legal, HR, compliance.
+---
 
-📌 Parallel Processing → Multiple questions answered instantly.
+## 📜 License
 
-📌 Scalable Deployment → Render + managed Pinecone integration.
-
-
-
-📈 Business Impact
-
-🏥 Insurance → Rapid claims triage & eligibility checks.
-
-⚖️ Legal → Contract clause extraction for due diligence.
-
-👥 HR → Employee policy interpretation.
-
-🛡 Compliance → Regulatory searches with audit trail.
-
-
-🔮 Future Enhancements
-
-🔄 Cross-document clause matching.
-
-💻 Web UI for uploads, search & highlighting.
-
-🔐 Role-based access control & audit logging.
-
-📦 Local FAISS fallback for offline use.
-
-⏩ Incremental indexing without re-embedding entire docs.
-
-
-
-📞 Contact
-
-Akhilesh Verma – av14021999@gmail.com
-
-Krishnakant Kushwaha – kushwahakrishnakant979@gmail.com
-
-
-
-📜 License
 MIT License
