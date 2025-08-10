@@ -58,6 +58,7 @@ Our solution:
 ---
 
 ## 📂 Project Structure
+```
 .
 ├── .env                     # Environment variables (API keys, config)
 ├── main.py                  # FastAPI entry point
@@ -71,6 +72,7 @@ Our solution:
 │   ├── Scripts/
 │   └── pyvenv.cfg
 └── __pycache__/             # Compiled Python cache for main.py
+```
 
 ---
 
@@ -92,10 +94,12 @@ PINECONE_INDEX_NAME=your_index_name
 
 # 4️⃣ Run App in Development Mode
 uvicorn main:app --reload
+```
 
 ---
 
 📡 Required API Structure:
+```
 Request Format:
 
 POST https://fastapi-hackrx-1.onrender.com/hackrx/run
@@ -132,55 +136,57 @@ Response Format:
         "Yes, for Plan A, the daily room rent is capped at 1% of the Sum Insured, and ICU charges are capped at 2% of the Sum Insured. These limits do not apply if the treatment is for a listed procedure in a Preferred Provider Network (PPN)."
     ]
 }
-
+```
 ---
 
 ## 💡 Implementation Highlights
-
-- 🔑 **Document Hashing** – MD5 to uniquely tag docs (`doc_id`) for filtering.
-- 📄 **Chunking** – 1000 chars, 200 overlap → balances context & redundancy.
-- 📌 **Marker Vector** – Stores doc-level embedding for quick reference.
-- ⚡ **Concurrency** – `asyncio.gather` for parallel Q&A handling.
-- 🧹 **Cleanup** – Temporary files deleted post-processing.
-
----
+```
+🔑 **Document Hashing** – MD5 to uniquely tag docs (`doc_id`) for filtering.
+📄 **Chunking** – 1000 chars, 200 overlap → balances context & redundancy.
+📌 **Marker Vector** – Stores doc-level embedding for quick reference.
+⚡ **Concurrency** – `asyncio.gather` for parallel Q&A handling.
+🧹 **Cleanup** – Temporary files deleted post-processing.
+```
 
 ## 🏆 Unique Selling Points (USP)
+```
+📌 **Strict Context Reliance** → Answers only from retrieved chunks.
+📌 **Traceable Evidence** → Metadata maps back to exact page & section.
+📌 **Multi-domain Ready** → Insurance, legal, HR, compliance.
+📌 **Parallel Processing** → Multiple questions answered instantly.
+📌 **Scalable Deployment** → Render + managed Pinecone integration.
+```
 
-- 📌 **Strict Context Reliance** → Answers only from retrieved chunks.
-- 📌 **Traceable Evidence** → Metadata maps back to exact page & section.
-- 📌 **Multi-domain Ready** → Insurance, legal, HR, compliance.
-- 📌 **Parallel Processing** → Multiple questions answered instantly.
-- 📌 **Scalable Deployment** → Render + managed Pinecone integration.
 
 ---
 
 ## 📈 Business Impact
-
+```
 - 🏥 **Insurance** → Rapid claims triage & eligibility checks.  
 - ⚖️ **Legal** → Contract clause extraction for due diligence.  
 - 👥 **HR** → Employee policy interpretation.  
 - 🛡 **Compliance** → Regulatory searches with audit trail.  
-
+```
 ---
 
 ## 🔮 Future Enhancements
-
+```
 - 🔄 **Cross-document clause matching**.  
 - 💻 **Web UI** for uploads, search & highlighting.  
 - 🔐 **Role-based access control** & audit logging.  
 - 📦 **Local FAISS fallback** for offline use.  
 - ⏩ **Incremental indexing** without re-embedding entire docs.  
-
+```
 ---
 
 ## 📞 Contact
-
+```
 - **Akhilesh Verma** – 📧 av14021999@gmail.com  
 - **Krishnakant Kushwaha** – 📧 kushwahakrishnakant979@gmail.com  
-
+```
 ---
 
 ## 📜 License
-
+```
 MIT License
+```
