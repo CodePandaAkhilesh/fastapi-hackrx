@@ -41,28 +41,31 @@ async def run_hackrx(payload: HackRxRequest):
         google_api_key=GEMINI_API_KEY
     )
 
-    # Always download PDF, embed, and upload chunks (no existence check)
-    pdf_path = "temp_doc.pdf"
+    # Download and save directly to latest.pdf
     try:
         response = requests.get(payload.documents)
         response.raise_for_status()
-        with open(pdf_path, "wb") as f:
+        os.makedirs("/tmp", exist_ok=True)
+        with open(LATEST_PDF_PATH, "wb") as f:
             f.write(response.content)
+        print(f"[INFO] PDF downloaded and saved to {LATEST_PDF_PATH}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error downloading PDF: {str(e)}")
 
+    # Load PDF for embeddings
     try:
-        loader = PyPDFLoader(pdf_path)
+        loader = PyPDFLoader(LATEST_PDF_PATH)
         docs = loader.load()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error loading PDF: {str(e)}")
 
+    # Split into chunks
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     split_docs = text_splitter.split_documents(docs)
-
     for i, d in enumerate(split_docs):
         d.metadata["doc_id"] = doc_id
 
+    # Store in Pinecone
     try:
         PineconeVectorStore.from_documents(
             documents=split_docs,
@@ -119,20 +122,7 @@ Answer:"""
     question_times = [r[1] for r in results]
 
     total_time = time.time() - start_total
-    avg_time = sum(question_times) / len(question_times) if question_times else 0
-
-    successful = sum(1 for a in final_answers if not a.lower().startswith("error"))
-    accuracy = (successful / len(final_answers) * 100) if final_answers else 0
-
     print(f"Total response time: {total_time:.2f} seconds")
-
-    # Save latest PDF to fixed path
-    try:
-        os.makedirs("/tmp", exist_ok=True)
-        os.replace(pdf_path, LATEST_PDF_PATH)
-        print(f"Latest PDF stored at: {LATEST_PDF_PATH}")
-    except Exception as e:
-        print(f"Warning: Failed to store latest PDF: {str(e)}")
 
     return {"answers": final_answers}
 
@@ -140,6 +130,7 @@ Answer:"""
 @router.get("/download-latest")
 async def download_latest_pdf():
     if os.path.exists(LATEST_PDF_PATH):
+        print(f"[INFO] Serving PDF from {LATEST_PDF_PATH}")
         return FileResponse(
             LATEST_PDF_PATH,
             media_type="application/pdf",
@@ -147,6 +138,7 @@ async def download_latest_pdf():
         )
     else:
         raise HTTPException(status_code=404, detail="No PDF found")
+
 # import os
 # import requests
 # import hashlib
