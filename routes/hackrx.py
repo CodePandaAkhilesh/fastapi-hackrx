@@ -3,6 +3,9 @@ import requests
 import hashlib
 import time
 import asyncio
+import zipfile
+from datetime import datetime
+from io import BytesIO
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -24,37 +27,43 @@ PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
 
-LATEST_PDF_PATH = "/tmp/latest.pdf"  # Fixed path for latest PDF
+# Directory to store all PDFs
+LATEST_PDF_DIR = "/tmp/pdfs"
+os.makedirs(LATEST_PDF_DIR, exist_ok=True)
 
 class HackRxRequest(BaseModel):
     documents: str       # URL to PDF
     questions: list[str] # List of questions
 
-
 @router.post("/run")
 async def run_hackrx(payload: HackRxRequest):
     start_total = time.time()
 
+    # Generate unique ID for PDF based on URL
     doc_id = hashlib.md5(payload.documents.encode("utf-8")).hexdigest()
+    pdf_path = os.path.join(LATEST_PDF_DIR, f"{doc_id}.pdf")
+
     embeddings = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001",
         google_api_key=GEMINI_API_KEY
     )
 
-    # Download and save directly to latest.pdf
-    try:
-        response = requests.get(payload.documents)
-        response.raise_for_status()
-        os.makedirs("/tmp", exist_ok=True)
-        with open(LATEST_PDF_PATH, "wb") as f:
-            f.write(response.content)
-        print(f"[INFO] PDF downloaded and saved to {LATEST_PDF_PATH}")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error downloading PDF: {str(e)}")
+    # Download PDF only if not already stored
+    if not os.path.exists(pdf_path):
+        try:
+            response = requests.get(payload.documents)
+            response.raise_for_status()
+            with open(pdf_path, "wb") as f:
+                f.write(response.content)
+            print(f"[INFO] PDF saved to {pdf_path}")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error downloading PDF: {str(e)}")
+    else:
+        print(f"[INFO] PDF already exists: {pdf_path}")
 
-    # Load PDF for embeddings
+    # Load PDF into LangChain
     try:
-        loader = PyPDFLoader(LATEST_PDF_PATH)
+        loader = PyPDFLoader(pdf_path)
         docs = loader.load()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error loading PDF: {str(e)}")
@@ -65,7 +74,7 @@ async def run_hackrx(payload: HackRxRequest):
     for i, d in enumerate(split_docs):
         d.metadata["doc_id"] = doc_id
 
-    # Store in Pinecone
+    # Store embeddings in Pinecone
     try:
         PineconeVectorStore.from_documents(
             documents=split_docs,
@@ -115,29 +124,39 @@ Answer:"""
         except Exception as e:
             return f"Error during search: {str(e)}", time.time() - start_q
 
-    # Run all questions concurrently
     results = await asyncio.gather(*(answer_question(q) for q in payload.questions))
-
     final_answers = [r[0] for r in results]
-    question_times = [r[1] for r in results]
 
     total_time = time.time() - start_total
     print(f"Total response time: {total_time:.2f} seconds")
 
     return {"answers": final_answers}
 
-
 @router.get("/download-latest")
-async def download_latest_pdf():
-    if os.path.exists(LATEST_PDF_PATH):
-        print(f"[INFO] Serving PDF from {LATEST_PDF_PATH}")
-        return FileResponse(
-            LATEST_PDF_PATH,
-            media_type="application/pdf",
-            filename="latest.pdf"
-        )
-    else:
-        raise HTTPException(status_code=404, detail="No PDF found")
+async def download_all_pdfs():
+    """Download all stored PDFs as a single ZIP file"""
+    pdf_files = [f for f in os.listdir(LATEST_PDF_DIR) if f.endswith(".pdf")]
+
+    if not pdf_files:
+        raise HTTPException(status_code=404, detail="No PDFs found")
+
+    # Create ZIP in memory
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for filename in pdf_files:
+            file_path = os.path.join(LATEST_PDF_DIR, filename)
+            zipf.write(file_path, arcname=filename)
+
+    zip_buffer.seek(0)
+    zip_filename = f"all_pdfs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+
+    # Send ZIP as download
+    return FileResponse(
+        zip_buffer,
+        media_type="application/zip",
+        filename=zip_filename
+    )
+
 
 # import os
 # import requests
