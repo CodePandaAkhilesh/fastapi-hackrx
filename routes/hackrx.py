@@ -3,11 +3,7 @@ import requests
 import hashlib
 import time
 import asyncio
-import zipfile
-from datetime import datetime
-from io import BytesIO
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
@@ -27,54 +23,43 @@ PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
 
-# Directory to store all PDFs
-LATEST_PDF_DIR = "/tmp/pdfs"
-os.makedirs(LATEST_PDF_DIR, exist_ok=True)
-
 class HackRxRequest(BaseModel):
     documents: str       # URL to PDF
     questions: list[str] # List of questions
+
 
 @router.post("/run")
 async def run_hackrx(payload: HackRxRequest):
     start_total = time.time()
 
-    # Generate unique ID for PDF based on URL
     doc_id = hashlib.md5(payload.documents.encode("utf-8")).hexdigest()
-    pdf_path = os.path.join(LATEST_PDF_DIR, f"{doc_id}.pdf")
-
     embeddings = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001",
         google_api_key=GEMINI_API_KEY
     )
 
-    # Download PDF only if not already stored
-    if not os.path.exists(pdf_path):
-        try:
-            response = requests.get(payload.documents)
-            response.raise_for_status()
-            with open(pdf_path, "wb") as f:
-                f.write(response.content)
-            print(f"[INFO] PDF saved to {pdf_path}")
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error downloading PDF: {str(e)}")
-    else:
-        print(f"[INFO] PDF already exists: {pdf_path}")
+    # Always download PDF, embed, and upload chunks (no existence check)
+    pdf_path = "temp_doc.pdf"
+    try:
+        response = requests.get(payload.documents)
+        response.raise_for_status()
+        with open(pdf_path, "wb") as f:
+            f.write(response.content)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error downloading PDF: {str(e)}")
 
-    # Load PDF into LangChain
     try:
         loader = PyPDFLoader(pdf_path)
         docs = loader.load()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error loading PDF: {str(e)}")
 
-    # Split into chunks
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     split_docs = text_splitter.split_documents(docs)
+
     for i, d in enumerate(split_docs):
         d.metadata["doc_id"] = doc_id
 
-    # Store embeddings in Pinecone
     try:
         PineconeVectorStore.from_documents(
             documents=split_docs,
@@ -105,14 +90,11 @@ async def run_hackrx(payload: HackRxRequest):
     async def answer_question(question: str):
         start_q = time.time()
         try:
-            docs = await asyncio.to_thread(
-                vectorstore.similarity_search, question, k=3, filter={"doc_id": doc_id}
-            )
+            docs = await asyncio.to_thread(vectorstore.similarity_search, question, k=3, filter={"doc_id": doc_id})
             context = "\n\n".join([doc.page_content for doc in docs])
             prompt = f"""Answer the following question strictly based on the provided context.
 The answer must be concise but at least 10 words long.
 If the answer is one word, explain it briefly.
-Always reply in the same language as the question.
 
 Context:
 {context}
@@ -125,168 +107,25 @@ Answer:"""
         except Exception as e:
             return f"Error during search: {str(e)}", time.time() - start_q
 
+    # Run all questions concurrently
     results = await asyncio.gather(*(answer_question(q) for q in payload.questions))
+
     final_answers = [r[0] for r in results]
+    question_times = [r[1] for r in results]
 
     total_time = time.time() - start_total
+    avg_time = sum(question_times) / len(question_times) if question_times else 0
+
+    successful = sum(1 for a in final_answers if not a.lower().startswith("error"))
+    accuracy = (successful / len(final_answers) * 100) if final_answers else 0
+
     print(f"Total response time: {total_time:.2f} seconds")
 
+    # Delete the temp PDF file after processing is complete
+    try:
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+    except Exception as e:
+        print(f"Warning: Failed to delete temp PDF file: {str(e)}")
+
     return {"answers": final_answers}
-
-@router.get("/download-latest")
-async def download_all_pdfs():
-    """Download all stored PDFs as a single ZIP file"""
-    pdf_files = [f for f in os.listdir(LATEST_PDF_DIR) if f.endswith(".pdf")]
-
-    if not pdf_files:
-        raise HTTPException(status_code=404, detail="No PDFs found")
-
-    # Create ZIP in memory
-    zip_buffer = BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for filename in pdf_files:
-            file_path = os.path.join(LATEST_PDF_DIR, filename)
-            zipf.write(file_path, arcname=filename)
-
-    zip_buffer.seek(0)
-    zip_filename = f"all_pdfs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-
-    # Send ZIP as download
-    return FileResponse(
-        zip_buffer,
-        media_type="application/zip",
-        filename=zip_filename
-    )
-
-
-# import os
-# import requests
-# import hashlib
-# import time
-# import asyncio
-# from fastapi import APIRouter, HTTPException
-# from pydantic import BaseModel
-# from dotenv import load_dotenv
-# from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-# from langchain_pinecone import PineconeVectorStore
-# from langchain_community.document_loaders import PyPDFLoader
-# from langchain.text_splitter import RecursiveCharacterTextSplitter
-# from pinecone import Pinecone
-
-# load_dotenv()
-
-# router = APIRouter()
-
-# GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-# PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-# PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
-
-# pc = Pinecone(api_key=PINECONE_API_KEY)
-# index = pc.Index(PINECONE_INDEX_NAME)
-
-# class HackRxRequest(BaseModel):
-#     documents: str       # URL to PDF
-#     questions: list[str] # List of questions
-
-
-# @router.post("/run")
-# async def run_hackrx(payload: HackRxRequest):
-#     start_total = time.time()
-
-#     doc_id = hashlib.md5(payload.documents.encode("utf-8")).hexdigest()
-#     embeddings = GoogleGenerativeAIEmbeddings(
-#         model="models/embedding-001",
-#         google_api_key=GEMINI_API_KEY
-#     )
-
-#     # Always download PDF, embed, and upload chunks (no existence check)
-#     pdf_path = "temp_doc.pdf"
-#     try:
-#         response = requests.get(payload.documents)
-#         response.raise_for_status()
-#         with open(pdf_path, "wb") as f:
-#             f.write(response.content)
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=f"Error downloading PDF: {str(e)}")
-
-#     try:
-#         loader = PyPDFLoader(pdf_path)
-#         docs = loader.load()
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error loading PDF: {str(e)}")
-
-#     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-#     split_docs = text_splitter.split_documents(docs)
-
-#     for i, d in enumerate(split_docs):
-#         d.metadata["doc_id"] = doc_id
-
-#     try:
-#         PineconeVectorStore.from_documents(
-#             documents=split_docs,
-#             embedding=embeddings,
-#             index_name=PINECONE_INDEX_NAME,
-#             ids=[f"{doc_id}-{i}" for i in range(len(split_docs))]
-#         )
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error storing vectors in Pinecone: {str(e)}")
-
-#     try:
-#         marker_embedding = embeddings.embed_query(payload.documents)
-#         index.upsert(vectors=[(doc_id, marker_embedding)])
-#     except Exception:
-#         pass
-
-#     vectorstore = PineconeVectorStore(
-#         index_name=PINECONE_INDEX_NAME,
-#         embedding=embeddings
-#     )
-
-#     llm = ChatGoogleGenerativeAI(
-#         model="gemini-2.5-flash",
-#         temperature=0,
-#         google_api_key=GEMINI_API_KEY
-#     )
-
-#     async def answer_question(question: str):
-#         start_q = time.time()
-#         try:
-#             docs = await asyncio.to_thread(vectorstore.similarity_search, question, k=3, filter={"doc_id": doc_id})
-#             context = "\n\n".join([doc.page_content for doc in docs])
-#             prompt = f"""Answer the following question strictly based on the provided context.
-# The answer must be concise but at least 10 words long.
-# If the answer is one word, explain it briefly.
-
-# Context:
-# {context}
-
-# Question: {question}
-
-# Answer:"""
-#             answer = await asyncio.to_thread(llm.invoke, prompt)
-#             return answer.content.strip(), time.time() - start_q
-#         except Exception as e:
-#             return f"Error during search: {str(e)}", time.time() - start_q
-
-#     # Run all questions concurrently
-#     results = await asyncio.gather(*(answer_question(q) for q in payload.questions))
-
-#     final_answers = [r[0] for r in results]
-#     question_times = [r[1] for r in results]
-
-#     total_time = time.time() - start_total
-#     avg_time = sum(question_times) / len(question_times) if question_times else 0
-
-#     successful = sum(1 for a in final_answers if not a.lower().startswith("error"))
-#     accuracy = (successful / len(final_answers) * 100) if final_answers else 0
-
-#     print(f"Total response time: {total_time:.2f} seconds")
-
-#     # Delete the temp PDF file after processing is complete
-#     try:
-#         if os.path.exists(pdf_path):
-#             os.remove(pdf_path)
-#     except Exception as e:
-#         print(f"Warning: Failed to delete temp PDF file: {str(e)}")
-
-#     return {"answers": final_answers}
