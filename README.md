@@ -2,7 +2,7 @@
 
 ## 💻 GitHub Repository
 **Code:** [https://github.com/CodePandaAkhilesh/fastapi-hackrx](https://github.com/CodePandaAkhilesh/fastapi-hackrx)  
-**Demo API:** [https://fastapi-hackrx-1.onrender.com/hackrx/run](https://fastapi-hackrx-1.onrender.com/hackrx/run)
+**API Endpoint:** [https://fastapi-hackrx-1.onrender.com/hackrx/run](https://fastapi-hackrx-1.onrender.com/hackrx/run)
 
 ---
 
