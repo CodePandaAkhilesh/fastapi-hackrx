@@ -181,7 +181,7 @@ Response Format:
 - 💻 Web UI** for uploads, search & highlighting.  
 - 🔐 Role-based access control & audit logging.  
 - 📦 Local FAISS fallback for offline use.  
-- ⏩ Incremental indexing without re-embedding entire docs.  
+- ⏩ Fine-tuning embeddings and prompts for domain-specific language (legal, insurance, HR).
 
 ---
 
