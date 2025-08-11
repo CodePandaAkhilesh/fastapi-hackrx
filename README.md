@@ -53,7 +53,7 @@ Our solution:
 1. User submits natural language query.  
 2. Pinecone retrieves top-k relevant chunks (filtered by `doc_id`).  
 3. Gemini LLM answers **only** from retrieved context.  
-4. Output returned as **JSON with answer & evidence metadata**.
+4. Output returned as **JSON with answer**.
 
 ---
 
