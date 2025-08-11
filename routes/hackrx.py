@@ -118,6 +118,7 @@ async def run_hackrx(payload: HackRxRequest):
             prompt = f"""Answer the following question strictly based on the provided context.
 The answer must be concise but at least 10 words long.
 If the answer is one word, explain it briefly.
+Reply in the same language as the question.
 
 Context:
 {context}
