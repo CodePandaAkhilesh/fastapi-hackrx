@@ -1,11 +1,11 @@
-fastapi==0.115.0
-uvicorn==0.32.0
-python-dotenv==1.0.1
-requests>=2.32.5
-pypdf==4.3.1
-langchain==1.0.5
-langchain-pinecone==0.2.13
-langchain-google-genai==3.0.2
-langchain-text-splitters==1.0.0
-pinecone-client==4.1.2
-google-generativeai==0.7.2
+fastapi                  # Web framework for building APIs with Python
+uvicorn                  # ASGI server to run FastAPI apps in development/production
+python-dotenv            # Loads environment variables from a .env file
+requests                 # HTTP library for making API calls (used to download PDFs)
+langchain                # Core LangChain library for building LLM-based applications
+langchain-community      # Community integrations for LangChain (document loaders, etc.)
+langchain-pinecone       # LangChain integration for Pinecone vector database
+langchain-google-genai   # LangChain integration for Google Generative AI (Gemini)
+pypdf                    # PDF processing library (used internally by PyPDFLoader)
+pinecone-client          # Official Pinecone Python SDK for vector storage & search
+gunicorn                 # Production-grade WSGI/ASGI server for deploying FastAPI apps
