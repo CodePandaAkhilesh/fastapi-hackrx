@@ -1,19 +1,11 @@
 fastapi==0.115.0
 uvicorn==0.32.0
 python-dotenv==1.0.1
-requests==2.32.3
+requests>=2.32.5
 pypdf==4.3.1
-
-# LangChain core + integrations
 langchain==1.0.5
-langchain-core==1.0.4
-langchain-community==0.4.1
 langchain-pinecone==0.2.13
 langchain-google-genai==3.0.2
 langchain-text-splitters==1.0.0
-
-# Pinecone client
 pinecone-client==4.1.2
-
-# Google Generative AI SDK
 google-generativeai==0.7.2
